@@ -1,0 +1,19 @@
+.container {
+    // border: 1px solid #f00;
+
+    form {
+        padding: 15px;
+
+        input[type="email"],
+        input[type="password"] {
+            display: block;
+            height: 30px;
+            width: 300px;
+            margin-top: 15px;
+            padding-left: 10px;
+        }
+        input[type="submit"] {
+            margin-top: 15px;
+        }
+    }
+}

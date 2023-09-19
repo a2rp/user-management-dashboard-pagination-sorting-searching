@@ -1,0 +1,47 @@
+GET http://localhost:1198/api/v1/a2rp
+
+### login
+POST http://localhost:1198/api/v1/login
+Content-Type: application/json
+
+{
+    "email": "ashish1@mail.com",
+    "password": "12345678"
+}
+
+### all users
+GET http://localhost:1198/api/v1/user-all
+
+### one user
+POST http://localhost:1198/api/v1/user
+Content-Type: application/json
+
+{
+    "email": "ashish1@mail.com"
+}
+
+### add user
+POST http://localhost:1198/api/v1/user-add
+Content-Type: application/json
+
+{
+    "name":"ashish ranjan",
+    "email": "admin@mail.com",
+    "password": "12345678",
+    "password_confirm": "12345678",
+    "role": "administrator"
+}
+
+### update user
+PATCH http://localhost:1198/api/v1/user-update
+Content-Type: application/json
+
+{
+    "email": "ashish1@mail.com",
+    "name": "user1 - updated",
+    "role": "admin"
+}
+
+### delete user
+DELETE http://localhost:1198/api/v1/user-delete/ashish5@mail.com
+
