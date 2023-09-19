@@ -4,12 +4,12 @@ React.js, Node.js, Chakra UI
 user-management-dashboard
 to run this application
 
-run backend
-- open the "backend" folder in vscode
-- open integrated terminal in root of the folder
-- in terminal type command "npm install" and press enter to install the node packages
-- after installation is complete type "npm run devStart" and press enter to run the application
-- open "postman" and run the endpoint
+run backend<br />
+- open the "backend" folder in vscode<br />
+- open integrated terminal in root of the folder<br />
+- in terminal type command "npm install" and press enter to install the node packages<br />
+- after installation is complete type "npm run devStart" and press enter to run the application<br />
+- open "postman" and run the endpoint<br />
 <br />
 http://localhost:1198/api/v1/user-add<br />
 Content-Type: application/json<br />
