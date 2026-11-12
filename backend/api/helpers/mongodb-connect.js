@@ -1,24 +1,13 @@
 const mongoose = require("mongoose");
 
-mongoose.connect(process.env.MONGODB_URI, { dbName: process.env.MONGODB_DBNAME }).then(() => {
-    console.log("connected to mongodb");
-}).catch((error) => {
-    console.log(`Error: ${error.message}`);
-});
+const connectToMongoDB = async () => {
+    const { MONGODB_URI, MONGODB_DBNAME } = process.env;
+    if (!MONGODB_URI || !MONGODB_DBNAME) {
+        throw new Error("MONGODB_URI and MONGODB_DBNAME must be configured");
+    }
 
-mongoose.connection.on("connected", () => {
-    console.log("connected to database");
-});
+    await mongoose.connect(MONGODB_URI, { dbName: MONGODB_DBNAME });
+    console.log("Connected to MongoDB");
+};
 
-mongoose.connection.on("error", () => {
-    console.log();
-});
-
-mongoose.connection.on("disconnected", () => {
-    console.log("mongoose disconnected");
-});
-
-process.on("SIGINT", async () => {
-    await mongoose.connection.close();
-    process.exit(0);
-});
+module.exports = { connectToMongoDB };

@@ -1,145 +1,180 @@
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const { randomUUID } = require("node:crypto");
 const UserModel = require("../models/user.model");
-const { v4: uuidv4 } = require('uuid');
+const { clearSessionCookie, setSessionCookie } = require("../helpers/session-cookie");
 
-const login = (req, res, next) => {
-    // console.log(req.body, "req.body");
-    if (!req.body.email || !req.body.password) {
-        return res.json({
-            success: false,
-            message: "All parameters required"
-        });
+const ALLOWED_ROLES = new Set(["administrator", "editor", "viewer"]);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizeRole = (role) => role === "admin" ? "administrator" : role;
+
+const publicUser = (user) => ({
+    userid: user.userid,
+    name: user.name,
+    email: user.email,
+    role: normalizeRole(user.role),
+});
+
+const login = async (req, res, next) => {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+
+    if (!email || !password) {
+        return res.status(400).json({ success: false, message: "Email and password are required" });
     }
 
-    UserModel.findOne({ email: req.body.email }).then(async user => {
-        if (!user) {
-            return res.json({
-                success: false,
-                message: "User not found"
-            });
+    try {
+        const user = await UserModel.findOne({ email });
+        const passwordMatches = user ? await bcrypt.compare(password, user.password) : false;
+
+        if (!passwordMatches) {
+            return res.status(401).json({ success: false, message: "Invalid email or password" });
         }
 
-        const comparePassword = await bcrypt.compare(req.body.password, user.password);
-        // console.log(comparePassword);
-        if (!comparePassword) {
-            return res.json({
-                success: false,
-                message: "Password mismatch"
-            });
-        }
+        const token = jwt.sign({}, process.env.JWT_SECRET, {
+            algorithm: "HS256",
+            subject: user.id,
+            expiresIn: "8h",
+        });
 
-        res.json({
-            success: true,
-            userid: user.userid,
-            name: user.name,
-            email: user.email,
-            role: user.role
-        });
-    }).catch(error => {
-        res.json({
-            success: false,
-            message: error.message
-        });
-    });
+        setSessionCookie(res, token);
+        return res.json({ success: true, user: publicUser(user), message: "Login successful" });
+    } catch (error) {
+        return next(error);
+    }
+};
+
+const getSession = (req, res) => res.json({ success: true, user: publicUser(req.user) });
+
+const logout = (req, res) => {
+    clearSessionCookie(res);
+    return res.json({ success: true, message: "Logged out" });
 };
 
 const allUsers = async (req, res, next) => {
     try {
-        const users = await UserModel.find({}).select({ "userid": 1, "name": 1, "email": 1, "role": 1, "_id": 0 });
-        res.json(users);
+        const users = await UserModel.find({})
+            .select({ userid: 1, name: 1, email: 1, role: 1, _id: 0 })
+            .sort({ name: 1, email: 1 })
+            .lean();
+        return res.json(users);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 };
 
 const getOneUser = async (req, res, next) => {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    if (!email || !EMAIL_PATTERN.test(email)) {
+        return res.status(400).json({ success: false, message: "A valid email is required" });
+    }
+
     try {
-        const user = await UserModel.find({ email: req.body.email });
-        // console.log(user);
-        const userData = {
-            success: true,
-            userid: user[0].userid,
-            name: user[0].name,
-            email: user[0].email,
-            role: user[0].role
-        };
-        // console.log(userData);
-        res.json(userData);
+        const user = await UserModel.findOne({ email }).select("userid name email role").lean();
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+        return res.json({ success: true, ...user });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return next(error);
     }
 };
 
 const addUser = async (req, res, next) => {
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    const { password, password_confirm: passwordConfirm, role } = req.body || {};
+
+    if (!name || name.length > 100 || !EMAIL_PATTERN.test(email)) {
+        return res.status(400).json({ success: false, message: "Enter a name and valid email address" });
+    }
+    if (typeof password !== "string" || Array.from(password).length < 12 || Buffer.byteLength(password) > 72) {
+        return res.status(400).json({ success: false, message: "Password must be at least 12 characters and no more than 72 UTF-8 bytes" });
+    }
+    if (password !== passwordConfirm) {
+        return res.status(400).json({ success: false, message: "Passwords do not match" });
+    }
+    if (!ALLOWED_ROLES.has(role)) {
+        return res.status(400).json({ success: false, message: "Select a valid role" });
+    }
+
     try {
-        const { name, email, password, password_confirm, role } = req.body;
-
-        const user = await UserModel.findOne({ email });
-        if (user) {
-            return res.json({ message: `${email} already exists` });
-        }
-
-        if (password.trim() !== password_confirm.trim()) {
-            return res.json({ message: `passwords do not match` });
-        }
-
-        const userid = "user" + (uuidv4().substring(0, 6));
-        const newUser = new UserModel({ userid, name, email, password, role });
-        await newUser.save();
-        res.json({
-            success: true,
-            message: "user added successfully"
+        const user = await UserModel.create({
+            userid: `user${randomUUID().replaceAll("-", "").slice(0, 12)}`,
+            name,
+            email,
+            password,
+            role,
         });
+        return res.status(201).json({ success: true, message: "User added successfully", user: publicUser(user) });
     } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-};
-
-const updateUser = async (req, res) => {
-    try {
-        const filter = { email: req.body.email };
-        const update = { name: req.body.name, role: req.body.role };
-        let updatedUser = await UserModel.findOneAndUpdate(filter, update);
-        updatedUser = await UserModel.findOne(filter);
-        res.json({
-            success: true,
-            userid: updatedUser.userid,
-            name: updatedUser.name,
-            email: updatedUser.email,
-            role: updatedUser.role
-        });
-    } catch (error) {
-        res.status(404).json({ message: error.message });
-    }
-};
-
-const deleteOneUser = async (req, res) => {
-    console.log(req.params);
-    try {
-        const deleted = await UserModel.findOneAndRemove({ email: req.params.email });
-        console.log(deleted);
-        if (deleted == null) {
-            res.status(400).send({
-                success: false,
-                message: req.params.email + ' was not found'
-            });
-        } else {
-            res.status(200).send({
-                success: true,
-                message: "user deleted"
-            });
+        if (error.code === 11000) {
+            return res.status(409).json({ success: false, message: "A user with that email already exists" });
         }
-    } catch (error) {
-        res.status(500).send(error);
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+        return next(error);
     }
 };
 
-module.exports = {
-    login,
-    allUsers,
-    getOneUser,
-    addUser,
-    updateUser,
-    deleteOneUser,
+const updateUser = async (req, res, next) => {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const requestedRole = req.body?.role;
+
+    if (!EMAIL_PATTERN.test(email) || !name || name.length > 100) {
+        return res.status(400).json({ success: false, message: "Enter a valid email and name" });
+    }
+
+    try {
+        const target = await UserModel.findOne({ email });
+        if (!target) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        const updates = { name };
+        if (req.user.role === "administrator") {
+            if (!ALLOWED_ROLES.has(requestedRole)) {
+                return res.status(400).json({ success: false, message: "Select a valid role" });
+            }
+            if (target.id === req.user.id && requestedRole !== normalizeRole(target.role)) {
+                return res.status(403).json({ success: false, message: "You cannot change your own role" });
+            }
+            updates.role = requestedRole;
+        } else if (requestedRole !== normalizeRole(target.role)) {
+            return res.status(403).json({ success: false, message: "Only administrators can change roles" });
+        }
+
+        const updatedUser = await UserModel.findByIdAndUpdate(target.id, updates, {
+            new: true,
+            runValidators: true,
+        });
+        return res.json({ success: true, ...publicUser(updatedUser) });
+    } catch (error) {
+        return next(error);
+    }
 };
 
+const deleteOneUser = async (req, res, next) => {
+    const email = typeof req.params.email === "string" ? req.params.email.trim().toLowerCase() : "";
+    if (!EMAIL_PATTERN.test(email)) {
+        return res.status(400).json({ success: false, message: "A valid email is required" });
+    }
+
+    try {
+        const target = await UserModel.findOne({ email });
+        if (!target) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+        if (target.id === req.user.id) {
+            return res.status(403).json({ success: false, message: "You cannot delete your own account" });
+        }
+        await target.deleteOne();
+        return res.json({ success: true, message: "User deleted" });
+    } catch (error) {
+        return next(error);
+    }
+};
+
+module.exports = { login, getSession, logout, allUsers, getOneUser, addUser, updateUser, deleteOneUser };

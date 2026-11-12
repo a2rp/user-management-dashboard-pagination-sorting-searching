@@ -1,47 +1,58 @@
-GET http://localhost:1198/api/v1/a2rp
+@baseUrl = http://localhost:1198/api/v1
+@adminEmail = you@example.com
+@adminPassword = replace-with-your-local-admin-password
+@userEmail = person@example.com
 
-### login
-POST http://localhost:1198/api/v1/login
+### Health check
+GET {{baseUrl}}/a2rp
+
+### Sign in (the REST client keeps the HTTP-only cookie for later requests)
+POST {{baseUrl}}/login
 Content-Type: application/json
 
 {
-    "email": "ashish1@mail.com",
-    "password": "12345678"
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
 }
 
-### all users
-GET http://localhost:1198/api/v1/user-all
+### Current session
+GET {{baseUrl}}/session
 
-### one user
-POST http://localhost:1198/api/v1/user
+### List users (any signed-in role)
+GET {{baseUrl}}/user-all
+
+### Read one user (any signed-in role)
+POST {{baseUrl}}/user
 Content-Type: application/json
 
 {
-    "email": "ashish1@mail.com"
+  "email": "{{userEmail}}"
 }
 
-### add user
-POST http://localhost:1198/api/v1/user-add
+### Add a user (administrator only)
+POST {{baseUrl}}/user-add
 Content-Type: application/json
 
 {
-    "name":"ashish ranjan",
-    "email": "admin@mail.com",
-    "password": "12345678",
-    "password_confirm": "12345678",
-    "role": "administrator"
+  "name": "Example User",
+  "email": "person@example.com",
+  "password": "replace-with-a-unique-12-character-password",
+  "password_confirm": "replace-with-a-unique-12-character-password",
+  "role": "viewer"
 }
 
-### update user
-PATCH http://localhost:1198/api/v1/user-update
+### Update a user (administrator or editor; editors can change names only)
+PATCH {{baseUrl}}/user-update
 Content-Type: application/json
 
 {
-    "email": "ashish1@mail.com",
-    "name": "user1 - updated",
-    "role": "admin"
+  "email": "{{userEmail}}",
+  "name": "Updated User",
+  "role": "viewer"
 }
 
-### delete user
-DELETE http://localhost:1198/api/v1/user-delete/ashish5@mail.com
+### Delete a user (administrator only)
+DELETE {{baseUrl}}/user-delete/{{userEmail}}
 
+### Sign out
+POST {{baseUrl}}/logout

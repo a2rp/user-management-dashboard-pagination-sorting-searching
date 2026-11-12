@@ -1,112 +1,98 @@
 import { Button, FormControl, FormLabel, Input, Select, Text } from "@chakra-ui/react";
-import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../../components/header/Header";
+import api from "../../api";
 
 const EditUser = () => {
     const { state } = useLocation();
-    const { email } = state;
-
-    const navigate = useNavigate(null);
-
-    // fetch user by email
-    const [user, setUser] = useState({ name: "", role: "" });
-    useEffect(() => {
-        axios.post(`http://localhost:1198/api/v1/user`, { email }).then(response => {
-            console.log(response.data);
-            setUser({ name: response.data.name, role: response.data.role });
-            setInputs({ name: response.data.name, role: response.data.role, email: response.data.email });
-            setSelected(response.data.role);
-        }).catch(error => {
-            console.log(error);
-        })
-    }, [email]);
-
+    const email = state?.email;
+    const navigate = useNavigate();
+    const isAdministrator = window.localStorage.getItem("role") === "administrator";
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [inputs, setInputs] = useState({
-        name: "",
-        email: "",
-        role: ""
-    });
+    const [response, setResponse] = useState("");
+    const [inputs, setInputs] = useState({ name: "", email: email || "", role: "" });
+
     useEffect(() => {
-        console.log(inputs);
-    }, [inputs]);
-
-    const handleInputsChange = (event) => {
-        setInputs({
-            ...inputs,
-            [event.target.name]: event.target.value
-        });
-    };
-    const handleUpdateUserSubmit = (event) => {
-        event.preventDefault();
-
-        console.log(inputs);
-        if (inputs.role === "") {
-            alert("role not selected");
-            return;
+        let active = true;
+        if (!email) {
+            navigate("/home", { replace: true });
+            return () => { active = false; };
         }
 
-        setIsSubmitting(true);
-        axios.patch(`http://localhost:1198/api/v1/user-update`, inputs).then(response => {
-            // console.log(response);
-            if (response.data.success) {
-                navigate("/home");
-            }
-        }).catch(error => {
-            console.log(error);
-        }).finally(() => {
-            setIsSubmitting(false);
-        });
+        api.post("/user", { email })
+            .then(({ data }) => {
+                if (active) setInputs({ name: data.name, email: data.email, role: data.role });
+            })
+            .catch((error) => {
+                if (active) setResponse(error.response?.data?.message || "Could not load this user.");
+            });
+
+        return () => { active = false; };
+    }, [email, navigate]);
+
+    const handleInputsChange = (event) => {
+        setInputs((current) => ({ ...current, [event.target.name]: event.target.value }));
     };
 
-    const [selected, setSelected] = useState();
-    const handleRoleChange = event => {
-        console.log(event.target.value);
-        setSelected(event.target.value);
-        setInputs({ ...inputs, role: event.target.value });
+    const handleUpdateUserSubmit = async (event) => {
+        event.preventDefault();
+        setIsSubmitting(true);
+        setResponse("");
+        try {
+            const { data } = await api.patch("/user-update", inputs);
+            if (data.success) navigate("/home", { replace: true });
+        } catch (error) {
+            setResponse(error.response?.data?.message || "Could not update this user.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
         <div>
             <Header />
-            <Text fontSize="20px" color="tomato" marginLeft="15px">
-                Update User
-            </Text>
-            <form onSubmit={handleUpdateUserSubmit} >
+            <Text fontSize="20px" color="tomato" marginLeft="15px">Update User</Text>
+            <form onSubmit={handleUpdateUserSubmit}>
                 <FormControl margin="15px" width="300px">
                     <FormLabel htmlFor="name">Name</FormLabel>
-                    <Input type="name" id="name" name="name" onChange={handleInputsChange} required value={inputs.name} placeholder="name" />
+                    <Input
+                        type="text"
+                        id="name"
+                        name="name"
+                        maxLength={100}
+                        onChange={handleInputsChange}
+                        required
+                        value={inputs.name}
+                        placeholder="Name"
+                    />
 
-                    <Select placeholder="Select option" onChange={handleRoleChange} value={selected} marginTop="30px">
-                        <option value="administrator" >administrator</option>
-                        <option value="viewer" >viewer</option>
+                    <FormLabel htmlFor="role" marginTop="30px">Role</FormLabel>
+                    <Select
+                        id="role"
+                        name="role"
+                        onChange={handleInputsChange}
+                        value={inputs.role}
+                        isDisabled={!isAdministrator}
+                    >
+                        <option value="administrator">administrator</option>
+                        <option value="viewer">viewer</option>
                         <option value="editor">editor</option>
                     </Select>
+                    {!isAdministrator && <Text fontSize="sm" mt={2}>Only administrators can change roles.</Text>}
 
-                    <Button
-                        mt={4}
-                        colorScheme="teal"
-                        isLoading={isSubmitting}
-                        type="submit"
-                    >
-                        Submit
+                    {response && <Text role="alert" color="red.500" mt={3}>{response}</Text>}
+
+                    <Button mt={4} colorScheme="teal" isLoading={isSubmitting} type="submit">
+                        Save changes
                     </Button>
-                    <Button
-                        mt={4}
-                        colorScheme="red"
-                        onClick={() => {
-                            navigate("/home");
-                        }}
-                        marginLeft="15px"
-                    >
+                    <Button mt={4} colorScheme="red" type="button" onClick={() => navigate("/home")} marginLeft="15px">
                         Cancel
                     </Button>
                 </FormControl>
             </form>
         </div>
-    )
-}
+    );
+};
 
-export default EditUser
+export default EditUser;

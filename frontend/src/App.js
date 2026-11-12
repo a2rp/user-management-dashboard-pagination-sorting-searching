@@ -4,7 +4,7 @@ import Login from "./pages/login";
 import Delete from "./pages/delete";
 
 import styles from "./styles.module.scss";
-import { NavLink, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 
 function App() {
     return (

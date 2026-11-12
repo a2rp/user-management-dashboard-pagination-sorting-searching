@@ -1,67 +1,56 @@
 import React, { useEffect, useState } from "react";
 import styles from "./styles.module.scss";
 import Header from "../../components/header/Header";
-import axios from "axios";
+import api from "../../api";
 import { useNavigate } from "react-router-dom";
-import { Button, FormControl, FormLabel, Heading } from "@chakra-ui/react";
-
-import { Input } from "@chakra-ui/react"
-import { Text } from '@chakra-ui/react'
+import { Button, FormControl, FormLabel, Heading, Input, Text } from "@chakra-ui/react";
 
 const Login = () => {
-    // check logged in user there or not to redirect to home page
-    const navigate = useNavigate(null);
-    const [userEmail, setUserEmail] = useState(window.localStorage.getItem("email") || "");
-    useEffect(() => {
-        if (userEmail.length > 0) {
-            navigate("/home");
-        }
-    }, []);
-
-    // axios response and form inputs
+    const navigate = useNavigate();
     const [response, setResponse] = useState("");
-    const [inputs, setInputs] = useState({
-        email: "", password: "",
-    });
-    const handleInputChange = (event) => {
-        setInputs({
-            ...inputs,
-            [event.target.name]: event.target.value
-        });
-    };
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [inputs, setInputs] = useState({ email: "", password: "" });
+
     useEffect(() => {
-        console.log(inputs);
-    }, [inputs]);
+        let active = true;
+        api.get("/session")
+            .then(({ data }) => {
+                if (!active) return;
+                window.localStorage.setItem("email", data.user.email);
+                window.localStorage.setItem("role", data.user.role);
+                navigate("/home", { replace: true });
+            })
+            .catch(() => {
+                window.localStorage.removeItem("email");
+                window.localStorage.removeItem("role");
+            });
 
-    // submit login form
-    const handleLoginSubmit = (event) => {
-        event.preventDefault();
-
-        const loginData = {
-            email: inputs.email,
-            password: inputs.password
+        return () => {
+            active = false;
         };
-        // console.log(loginData);
+    }, [navigate]);
+
+    const handleInputChange = (event) => {
+        setInputs((current) => ({ ...current, [event.target.name]: event.target.value }));
+    };
+
+    const handleLoginSubmit = async (event) => {
+        event.preventDefault();
         setResponse("");
         setIsSubmitting(true);
-        axios.post(`http://localhost:1198/api/v1/login`, loginData).then(response => {
-            console.log(response, "response");
-            setResponse(response.data.message);
-            if (response.data.success) {
-                window.localStorage.setItem("email", response.data.email);
-                window.localStorage.setItem("role", response.data.role);
-                window.location.reload();
-            } else {
-                setIsSubmitting(false);
-            }
-        }).catch(err => {
-            console.log(err);
-            setResponse(err.message);
-            setIsSubmitting(false);
-        });
-    };
 
-    const [isSubmitting, setIsSubmitting] = useState(false);
+        try {
+            const { data } = await api.post("/login", inputs);
+            window.localStorage.setItem("email", data.user.email);
+            window.localStorage.setItem("role", data.user.role);
+            setInputs({ email: "", password: "" });
+            navigate("/home", { replace: true });
+        } catch (error) {
+            setResponse(error.response?.data?.message || "Unable to sign in. Check the API connection and try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     return (
         <div className={styles.container}>
@@ -71,27 +60,41 @@ const Login = () => {
             <form onSubmit={handleLoginSubmit}>
                 <FormControl margin="15px" width="300px">
                     <FormLabel htmlFor="email">Email address</FormLabel>
-                    <Input type="email" id="email" name="email" onChange={handleInputChange} required value={inputs.email} placeholder="email" />
+                    <Input
+                        type="email"
+                        id="email"
+                        name="email"
+                        autoComplete="username"
+                        onChange={handleInputChange}
+                        required
+                        value={inputs.email}
+                        placeholder="email"
+                    />
 
                     <FormLabel htmlFor="password" marginTop="30px">Password</FormLabel>
-                    <Input type="password" id="password" name="password" className={styles.password} placeholder="Password" onChange={handleInputChange} required value={inputs.password} />
+                    <Input
+                        type="password"
+                        id="password"
+                        name="password"
+                        autoComplete="current-password"
+                        className={styles.password}
+                        placeholder="Password"
+                        onChange={handleInputChange}
+                        required
+                        value={inputs.password}
+                    />
 
-                    <Button
-                        mt={4}
-                        colorScheme="teal"
-                        isLoading={isSubmitting}
-                        type="submit"
-                    >
-                        Submit
+                    <Button mt={4} colorScheme="teal" isLoading={isSubmitting} type="submit">
+                        Sign in
                     </Button>
                 </FormControl>
             </form>
 
-            <Text fontSize='20px' color='tomato' marginLeft="15px">
+            <Text fontSize="20px" color="tomato" marginLeft="15px" role="alert">
                 {response}
             </Text>
         </div>
-    )
-}
+    );
+};
 
-export default Login
+export default Login;

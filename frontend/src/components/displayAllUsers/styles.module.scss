@@ -1,59 +1,61 @@
 .container {
-    // border: 1px solid #f00;
+    width: 100%;
 
     .tableContainer {
-        // border: 1px solid #f00;
-        height: 300px;
-        padding: 15px;
+        max-height: 360px;
+        margin: 15px;
         overflow: auto;
+        border: 1px solid #252b32;
+        border-radius: 8px;
 
         .table {
             width: 100%;
+            min-width: 760px;
             table-layout: fixed;
 
             .thead {
-                .tr {
-                    .th {
-                        background-color: #000;
-                        border: 1px solid #fff;
-                        color: #fff;
-                        padding: 15px;
-                        text-align: center;
-                    }
+                position: sticky;
+                top: 0;
+                z-index: 1;
+
+                .th {
+                    padding: 5px;
+                    text-align: center;
+                    color: #fff;
+                    background-color: #11171c;
+                    border-bottom: 1px solid #323940;
                 }
             }
-            .tbody {
-                .tr {
-                    .td {
-                        text-align: center;
-                        padding: 10px;
-                    }
-                }
+
+            .tbody .td {
+                padding: 10px;
+                overflow-wrap: anywhere;
+                text-align: center;
             }
         }
     }
 
     .nav {
-        padding: 15px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 15px 18px;
+        color: #65717d;
+        font-size: 0.9rem;
+    }
 
-        ul {
-            list-style-type: none;
+    .paginationControls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+}
 
-            li {
-                display: inline-block;
-
-                .previous,
-                .next,
-                a {
-                    display: block;
-                    border: 1px solid #00f;
-                    padding: 15px;
-
-                    &:hover {
-                        background-color: #aaa;
-                    }
-                }
-            }
-        }
+@media (max-width: 600px) {
+    .container .nav {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }

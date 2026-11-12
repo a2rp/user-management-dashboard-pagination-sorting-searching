@@ -1,59 +1,57 @@
-import { AlertDialog, AlertDialogBody, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogOverlay, Button } from '@chakra-ui/react';
-import axios from 'axios';
-import React, { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom';
+import { AlertDialog, AlertDialogBody, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogOverlay, Button, Text } from "@chakra-ui/react";
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import api from "../../api";
 
 const Delete = () => {
     const { state } = useLocation();
-    const { email } = state;
+    const email = state?.email;
+    const navigate = useNavigate();
+    const [isOpen, setIsOpen] = useState(Boolean(email));
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
+    const cancelRef = useRef();
 
-    const navigate = useNavigate(null);
+    useEffect(() => {
+        if (!email) navigate("/home", { replace: true });
+    }, [email, navigate]);
 
-    const [isOpen, setIsOpen] = useState(true);
-    const onClose = () => { setIsOpen(false); navigate("/home"); };
-    const cancelRef = React.useRef();
+    const onClose = () => {
+        setIsOpen(false);
+        navigate("/home", { replace: true });
+    };
 
-    const deleteUser = () => {
-        console.log("deleted", email);
-        axios.delete(`http://localhost:1198/api/v1/user-delete/${email}`).then(response => {
-            console.log(response);
-        }).catch(error => {
-            console.log(error.message);
-        }).finally(() => {
-            navigate("/home");
-        });
+    const deleteUser = async () => {
+        setIsSubmitting(true);
+        setErrorMessage("");
+        try {
+            await api.delete(`/user-delete/${encodeURIComponent(email)}`);
+            navigate("/home", { replace: true });
+        } catch (error) {
+            setErrorMessage(error.response?.data?.message || "Could not delete this user.");
+            setIsSubmitting(false);
+        }
     };
 
     return (
-        <div>
-            <AlertDialog
-                isOpen={isOpen}
-                leastDestructiveRef={cancelRef}
-                onClose={onClose}
-            >
-                <AlertDialogOverlay>
-                    <AlertDialogContent>
-                        <AlertDialogHeader fontSize='lg' fontWeight='bold'>
-                            Delete User
-                        </AlertDialogHeader>
+        <AlertDialog isOpen={isOpen} leastDestructiveRef={cancelRef} onClose={onClose}>
+            <AlertDialogOverlay>
+                <AlertDialogContent>
+                    <AlertDialogHeader fontSize="lg" fontWeight="bold">Delete User</AlertDialogHeader>
+                    <AlertDialogBody>
+                        Are you sure you want to delete {email}? This action cannot be undone.
+                        {errorMessage && <Text role="alert" color="red.500" mt={3}>{errorMessage}</Text>}
+                    </AlertDialogBody>
+                    <AlertDialogFooter>
+                        <Button ref={cancelRef} onClick={onClose} isDisabled={isSubmitting}>Cancel</Button>
+                        <Button colorScheme="red" onClick={deleteUser} ml={3} isLoading={isSubmitting}>
+                            Delete user
+                        </Button>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialogOverlay>
+        </AlertDialog>
+    );
+};
 
-                        <AlertDialogBody>
-                            Are you sure? You can't undo this action afterwards.
-                        </AlertDialogBody>
-
-                        <AlertDialogFooter>
-                            <Button ref={cancelRef} onClick={onClose}>
-                                Cancel
-                            </Button>
-                            <Button colorScheme='red' onClick={deleteUser} ml={3}>
-                                Delete User
-                            </Button>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialogOverlay>
-            </AlertDialog>
-        </div>
-    )
-}
-
-export default Delete
+export default Delete;
